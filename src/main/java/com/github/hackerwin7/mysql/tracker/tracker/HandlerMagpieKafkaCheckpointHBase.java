@@ -254,7 +254,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                     }
                 });
                 sendMonitor.start();
-                logger.error("connect zk failed , retrying......");
+                logger.error("connect mysql failed ... retry to connect it...  exception is " + e.getMessage(), e);
                 e.printStackTrace();
                 delay(3);
             }
