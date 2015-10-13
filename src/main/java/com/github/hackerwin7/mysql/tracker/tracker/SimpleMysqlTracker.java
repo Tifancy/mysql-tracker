@@ -44,6 +44,9 @@ public class SimpleMysqlTracker {
     private static  String password = "canalssss";
     private static  long slaveId = 9876;
 
+    private static String logFileName = null;
+    private static long logFilePos = 0;
+
     /*filter*/
     private Map<String, String> filter = new HashMap<String, String>();
 
@@ -89,11 +92,19 @@ public class SimpleMysqlTracker {
         slaveId = Long.valueOf(po.getProperty("slaveId"));
         username = po.getProperty("username");
         password = po.getProperty("password");
+        String posStr = po.getProperty("pos");
+        if(!StringUtils.isBlank(posStr)) {
+            String[] ps = posStr.split(":");
+            logFileName = ps[0];
+            logFilePos = Long.valueOf(ps[1]);
+        }
         filter.clear();
         String fs = po.getProperty("filter");
-        String dbtb[] = fs.split(",");
-        for(String dt : dbtb) {
-            filter.put(dt, dt);
+        if(!StringUtils.isBlank(fs)) {
+            String dbtb[] = fs.split(",");
+            for (String dt : dbtb) {
+                filter.put(dt, dt);
+            }
         }
         logger.info("load conf:" + addr + "," + port + "," + slaveId + "," + username + "," + password + "," + filter);
     }
@@ -108,11 +119,17 @@ public class SimpleMysqlTracker {
         queryExecutor = new MysqlQueryExecutor(connector);
         updateExecutor = new MysqlUpdateExecutor(connectorTable);
         logger.info("finding start position......");
-        startPosition = findStartPosition();
+        if(logFileName == null) {
+            startPosition = findStartPosition();
+        } else {
+            startPosition = new EntryPosition(logFileName, logFilePos);
+        }
         tableMetaCache = new TableMetaCache(connectorTable);
         eventParser = new LogEventConvert();
         eventParser.setTableMetaCache(tableMetaCache);
         eventParser.filterMap.putAll(filter);
+        logger.info("filter = " + filter + ", size = " + filter.size());
+        logger.info("start position = " + startPosition.getBinlogPosFileName() + ":" + startPosition.getPosition());
     }
 
     private EntryPosition findStartPosition() throws IOException {

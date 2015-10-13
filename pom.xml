@@ -27,7 +27,7 @@
 
     <groupId>com.github.hackerwin7</groupId>
     <artifactId>mysql-tracker</artifactId>
-    <version>1.4.0.1</version>
+    <version>1.4.0.2</version>
 
     <dependencies>
         <dependency>
@@ -346,13 +346,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.9.1</version>
+                <version>2.10.3</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
                         <goals>
                             <goal>jar</goal>
                         </goals>
+                        <configuration>
+                            <additionalparam>-Xdoclint:none</additionalparam>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
