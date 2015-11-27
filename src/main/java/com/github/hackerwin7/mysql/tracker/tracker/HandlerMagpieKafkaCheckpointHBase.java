@@ -40,10 +40,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -96,12 +93,14 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
     private FilterMatcher fm;
     //global start time
     private long startTime;
-    //thread
-    Fetcher fetcher;
-    Timer timer;
-    Minuter minter;
-    Timer htimer;
-    HeartBeat heartBeat;
+    //thread and timer task job
+    private Fetcher fetcher;
+    private Timer cptimer;
+    private Timer htimer;
+    private HeartBeat heartBeat;
+    private ConfirmCP confirm;
+    //heartbeat alive
+    private boolean isHeartBeatAlive = true;
     //monitor
     private TrackerMonitor monitor;
     //global var
@@ -116,6 +115,8 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
     private boolean isFetchRunning = false;
     //check position
     private CheckpointUtil cpUtil = null;
+    //every minute save to the atomic cp
+    private String ConCP = null;
     //debug var
 
     //delay time
@@ -143,6 +144,8 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         config.jobId = jobId;
         //init envrionment config (local,off-line,on-line)
         config.initConfOnlineJSON();//config.initConfJSON();//config.initConfStatic();
+        //show the laod conf
+        logger.info(config.toString());
         //jobId
         jobId = config.jobId;
         //load position
@@ -218,6 +221,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         kcnf.port = config.kafkaPort;
         kcnf.topic = config.topic;
         kcnf.acks = config.acks;
+        kcnf.compression = TrackerConf.kafkaCompression;
         msgSender = new KafkaSender(kcnf);
         msgSender.connect();
         //zk
@@ -273,10 +277,10 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         globalFetchThread = 0;
         //thread config
         fetcher = new Fetcher();
-        timer = new Timer();
-        minter = new Minuter();
+        cptimer = new Timer();
         htimer = new Timer();
         heartBeat = new HeartBeat();
+        confirm = new ConfirmCP();
         //monitor
         monitor = new TrackerMonitor();
         //global var
@@ -422,8 +426,8 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         //start thread
         fetchSurvival = true;
         fetcher.start();
-        timer.schedule(minter, 1000, config.minsec * 1000);
-        htimer.schedule(heartBeat, 1000, config.heartsec * 1000);
+        cptimer.schedule(confirm, TrackerConf.TIMER_TASK_DELAY, TrackerConf.CONFIRM_INTERVAL);
+        htimer.schedule(heartBeat, TrackerConf.TIMER_TASK_DELAY, TrackerConf.HEARTBEAT_INTERVAL);
         //ip monitor
         //send monitor
         final String localIp = InetAddress.getLocalHost().getHostAddress();
@@ -445,7 +449,8 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         sendMonitor.start();
         //log
         logger.info("start the tracker successfully......");
-        delay(3);//waiting threads start
+        logger.info("waiting prepare thread starting......");
+        delay(5);//waiting threads start
     }
 
     class Fetcher extends Thread {
@@ -565,7 +570,9 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                     }
                     if(iskilled) break;
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                logger.error("fetch thread encountered error : " + e.getMessage(), e);
+                logger.info("fetch thread isKilled = " + iskilled);
                 if(iskilled) return;
                 //send monitor
                 final String exmsg = e.getMessage();
@@ -621,7 +628,8 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
             position = new EntryPosition(vs[0], Long.valueOf(vs[1]));
             batchId = Long.valueOf(vs[2]);
             inBatchId = Long.valueOf(vs[3]);
-            logger.info("start position :" + position.getBinlogPosFileName() + ":" + position.getPosition() +
+            logger.info("=========================> checkpoint load :");
+            logger.info("---------------> start position :" + position.getBinlogPosFileName() + ":" + position.getPosition() +
                     ":" + batchId +
                     ":" + inBatchId);
             return position;
@@ -663,183 +671,100 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         }
     }
 
-    class Minuter extends TimerTask {
-
-        private Logger logger = LoggerFactory.getLogger(Minuter.class);
-
-        @Override
-        public void run(){
-            Calendar cal = Calendar.getInstance();
-            DateFormat sdf = new SimpleDateFormat("HH:mm");
-            DateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd");
-            String time = sdf.format(cal.getTime());
-            String date = sdfDate.format(cal.getTime());
-            String[] tt = time.split(":");
-            String hour = tt[0];
-            String xidValue = null;
-            long pos = -1;
-            if(globalXidEntry != null) {
-                pos = globalXidEntry.getHeader().getLogfileOffset() + globalXidEntry.getHeader().getEventLength();
-                xidValue = globalBinlogName + ":" + pos + ":" + globalXidBatchId + ":" + globalXidInBatchId;
-            } else {
-                pos = -1;
-                xidValue = globalBinlogName + ":" + "-1" + ":" + globalXidBatchId + ":" + globalXidInBatchId;
-            }
-            try {
-//                if(!zkExecutor.exists(config.minutePath+"/"+date)) {
-//                    zkExecutor.create(config.minutePath+"/"+date,date);
-//                }
-//                if(!zkExecutor.exists(config.minutePath+"/"+date+"/"+hour)) {
-//                    zkExecutor.create(config.minutePath+"/"+date+"/"+hour, hour);
-//                }
-//                if(!zkExecutor.exists(config.minutePath+"/"+date+"/"+hour+"/"+time)) {
-//                    zkExecutor.create(config.minutePath + "/" + date + "/" + hour + "/" + time, time);
-//                }
-//                if(!zkExecutor.exists(config.minutePath+"/"+date+"/"+hour+"/"+time+"/"+jobId)) {
-//                    zkExecutor.create(config.minutePath+"/"+date+"/"+hour+"/"+time+"/"+jobId, xidValue);
-//                } else {
-//                    zkExecutor.set(config.minutePath+"/"+date+"/"+hour+"/"+time+"/"+jobId, xidValue);
-//                }
-            } catch (Exception e) {
-                //send monitor
-                final String exmsg = e.getMessage();
-                Thread sendMonitor = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            TrackerMonitor exMonitor = new TrackerMonitor();
-                            exMonitor.exMsg = exmsg;
-                            JrdwMonitorVo jmv = exMonitor.toJrdwMonitorOnline(JDMysqlTrackerMonitorType.EXCEPTION_MONITOR, jobId);
-                            String jsonStr = JSONConvert.JrdwMonitorVoToJson(jmv).toString();
-                            KeyedMessage<String, byte[]> km = new KeyedMessage<String, byte[]>(config.phKaTopic, null, jsonStr.getBytes("UTF-8"));
-                            phMonitorSender.sendKeyMsg(km);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-                sendMonitor.start();
-                logger.error("minute record position thread exception, " + e.getMessage(), e);
-                boolean isconn = false;
-                int retryZk = 0;
-                while (!isconn) { //retry
-                    if(retryZk >= config.retrys) {//reload
-                        globalFetchThread = 1;
-                        return;
-                    }
-                    retryZk++;
-                    try {
-                        if(!zkExecutor.exists(config.minutePath+"/"+date)) {
-                            zkExecutor.create(config.minutePath+"/"+date,date);
-                        }
-                        if(!zkExecutor.exists(config.minutePath+"/"+date+"/"+hour)) {
-                            zkExecutor.create(config.minutePath+"/"+date+"/"+hour, hour);
-                        }
-                        if(!zkExecutor.exists(config.minutePath+"/"+date+"/"+hour+"/"+time)) {
-                            zkExecutor.create(config.minutePath + "/" + date + "/" + hour + "/" + time, time);
-                        }
-                        if(!zkExecutor.exists(config.minutePath+"/"+date+"/"+hour+"/"+time+"/"+jobId)) {
-                            zkExecutor.create(config.minutePath+"/"+date+"/"+hour+"/"+time+"/"+jobId, xidValue);
-                        } else {
-                            zkExecutor.set(config.minutePath+"/"+date+"/"+hour+"/"+time+"/"+jobId, xidValue);
-                        }
-                        isconn = true;
-                    } catch (Exception e1) {
-                        //send monitor
-                        final String exmsg1 = e1.getMessage();
-                        Thread sendMonitor1 = new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    TrackerMonitor exMonitor = new TrackerMonitor();
-                                    exMonitor.exMsg = exmsg1;
-                                    JrdwMonitorVo jmv = exMonitor.toJrdwMonitorOnline(JDMysqlTrackerMonitorType.EXCEPTION_MONITOR, jobId);
-                                    String jsonStr = JSONConvert.JrdwMonitorVoToJson(jmv).toString();
-                                    KeyedMessage<String, byte[]> km = new KeyedMessage<String, byte[]>(config.phKaTopic, null, jsonStr.getBytes("UTF-8"));
-                                    phMonitorSender.sendKeyMsg(km);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        });
-                        sendMonitor1.start();
-                        logger.error("retrying...... Exception:" +e1.getMessage());
-                        delay(3);
-                    }
-                }
-            }
-            logger.info("===================================> per minute thread :");
-            logger.info("---> binlog file is " + globalBinlogName +
-                    ",position is :" + pos + "; batch id is :" + globalXidBatchId +
-                    ",in batch id is :" + globalXidInBatchId);
-        }
-    }
-
     class HeartBeat extends TimerTask {
         private Logger logger = LoggerFactory.getLogger(HeartBeat.class);
 
         public void run() {
-            logger.info("=================================> check assembly heartbeats......");
 
-            //run function heartbeat
-            logger.info("-------> globalFetchThread :" + globalFetchThread);
-            logger.info("-------> size of entryQueue :" + entryQueue.size());
-            logger.info("-------> fetchSurvival :" + fetchSurvival);
+            try {
 
-            //check mysql connection heartbeat
-            if(!logConnector.isConnected() || !tableConnector.isConnected() || !realConnector.isConnected()) {
-                logger.info("mysql connection loss, reload the job ......");
+                logger.info("=================================> check assembly heartbeats......");
+
+                //run function heartbeat
+                logger.info("-------> globalFetchThread :" + globalFetchThread);
+                logger.info("-------> size of entryQueue :" + entryQueue.size());
+                logger.info("-------> fetch thread status :" + fetcher.getState());
+                logger.info("-------> queue size = " + entryQueue.size());
+
+                //check mysql connection heartbeat
+                if(!logConnector.isConnected() || !tableConnector.isConnected() || !realConnector.isConnected()) {
+                    logger.error("mysql connection loss, reload the job ......");
+                    globalFetchThread = 1;
+                    return;
+                }
+                //check kafka sender
+                if(!msgSender.isConnected()) {
+                    logger.error("kafka producer connection loss, reload the job ......");
+                    globalFetchThread = 1;
+                    return;
+                }
+                //check phoenix kafka sender
+                if(!phMonitorSender.isConnected()) {
+                    logger.error("phoenix kafka producer connection loss, reload the job ......");
+                    globalFetchThread = 1;
+                    return;
+                }
+                //check zk connection
+                if(!zkExecutor.isConnected()) {
+                    logger.error("zookeeper connection loss, reload the job ......");
+                    globalFetchThread = 1;
+                    return;
+                }
+                //check fetch survival
+                if(!fetchSurvival) {
+                    logger.error("fetch thread had been dead, reload the job ......");
+                    globalFetchThread = 1;
+                    return;
+                }
+                if(!fetcher.isAlive()) {
+                    logger.error("fetch thread is not alive, reloading the job ......");
+                    globalFetchThread = 1;
+                    return;
+                }
+            } catch (Throwable e) {
+                logger.error(e.getMessage(), e);
+                logger.info("heartbeat encountered error, reloading job......");
                 globalFetchThread = 1;
-                return;
-            }
-            //check mysql connection further
-            if(!isMysqlConnected()) {
-                logger.info("mysql connection loss, reload the job ......");
-                globalFetchThread = 1;
-                return;
-            }
-            //check kafka sender
-            if(!msgSender.isConnected()) {
-                logger.info("kafka producer connection loss, reload the job ......");
-                globalFetchThread = 1;
-                return;
-            }
-            //check phoenix kafka sender
-            if(!phMonitorSender.isConnected()) {
-                logger.info("phoenix kafka producer connection loss, reload the job ......");
-                globalFetchThread = 1;
-                return;
-            }
-            //check zk connection
-            if(!zkExecutor.isConnected()) {
-                logger.info("zookeeper connection loss, reload the job ......");
-                globalFetchThread = 1;
-                return;
-            }
-            //check fetch survival
-            if(!fetchSurvival) {
-                logger.info("fetch thread had been dead, reload the job ......");
-                globalFetchThread = 1;
-                return;
             }
         }
+    }
 
-        private boolean isMysqlConnected() {
-            MysqlConnector hconn = null;
-            try {
-                hconn = new MysqlConnector(new InetSocketAddress(config.address, config.myPort),
-                        config.username,
-                        config.password);
-                hconn.connect();
-                hconn.disconnect();
-            } catch (IOException e) {
-                return false;
+    /*confirm cp per minute*/
+    class ConfirmCP extends TimerTask {
+
+        /*logger*/
+        private Logger logger = LoggerFactory.getLogger(ConfirmCP.class);
+
+        /**
+         * confirm the checkpoint in a fixed time internal
+         */
+        @Override
+        public void run() {
+            /*confirm the checkpoint*/
+            int count = 0;
+            while (count < TrackerConf.CP_RETRY_COUNT) {
+                try {
+                    if (!StringUtils.isBlank(ConCP)) {
+                        cpUtil.writeCp(jobId, ConCP);
+                    }
+                    break;//if send success
+                } catch (Throwable e) {
+                    logger.error("confirm minuter is dead, error = " + e.getMessage(), e);
+                    count++;
+                }
             }
-            return true;
+            if(count >= TrackerConf.CP_RETRY_COUNT) {
+                logger.error("confirm checkpoint failed by " + count + " times, reloading the job......");
+                globalFetchThread = 1;
+            }
         }
     }
 
     public void run() throws Exception {
+
+        //heartbeat thread is dead, reloading immediately
+
+
         //cpu 100%
         if(entryQueue.isEmpty()) {
             delayMin(100);
@@ -856,16 +781,27 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
 
         //waiting for prepare finish and prepare's thread finish or run onece
         if(!isFetchRunning){
-            delay(1);
+            delay(3);
             return;
         }
+
+        //while heart time
+        int continuousFiltered = 0;
+        int continuousZero = 0;
 
         //take the data from the queue
         while (!entryQueue.isEmpty()) {
             CanalEntry.Entry entry = entryQueue.take();
             if(entry == null) continue;
-            lastEntry = entry;//all entry can be last entry !!!!!
-            if(isInMap(entry.getHeader().getSchemaName() + "." + entry.getHeader().getTableName())) {
+            //only persist the xid event (that is to say commit event)
+            //think about that a whole batch events is send but there is no xid event in this batch
+            //  we do not persist cp in this batch until there is a xid event in later batch events
+            //  if restart tracker, so we send repeated data, but parser can filter it by batchId and inBatchId (sequence id)
+            if(isEndCommitEntry(entry))
+                lastEntry = entry;
+            String dbtb = entry.getHeader().getSchemaName() + "." + entry.getHeader().getTableName();
+            if(isInMap(dbtb)) {
+                continuousFiltered = 0;
                 // re-pack the entry
                 entry =
                         CanalEntry.Entry.newBuilder()
@@ -885,8 +821,16 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                 monitor.batchSize += value.length;
                 KeyedMessage<String, byte[]> km = new KeyedMessage<String, byte[]>(config.topic, null, value);
                 messageList.add(km);
+            } else {
+                continuousFiltered++;
+                if(continuousFiltered >= TrackerConf.FILTER_NUM_LOGGER) {
+                    logger.info("=================================> filtered entries:");
+                    logger.info("----> filtered num = " + continuousFiltered);
+                    logger.info("----> last filtered entry dbname.tbname = " + dbtb);
+                    continuousFiltered = 0;//reset
+                }
             }
-            if(messageList.size() >= config.batchsize || (monitor.batchSize / config.mbUnit) >= config.spacesize ) break;
+            if(messageList.size() >= config.batchsize || monitor.batchSize >= config.spacesize ) break;
         }
         //per minute record
 //        if(lastEntry != null) {
@@ -902,18 +846,30 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         //     so the mysqlbinlog:pos <--> batchId:inBatchId Not must be same event to same event
         // mysqlbinlog:pos <- no filter list's xid  batchid:inBatchId <- filter list's last event
         //entryList data to kafka , per time must confirm the position
-        if((messageList.size() >= config.batchsize || (monitor.batchSize / config.mbUnit) >= config.spacesize ) || (System.currentTimeMillis() - startTime) > config.timeInterval * 1000 ) {
+        if((messageList.size() >= config.batchsize || monitor.batchSize >= config.spacesize ) || (System.currentTimeMillis() - startTime) > config.timeInterval * 1000 ) {
             //if(lastEntry == null) return; // not messageList but entryList or lastEntry , when we fetched not filtered data , we also confirm the position for it
             if(messageList.size() > 0) {
                 monitor.persisNum = messageList.size();
                 monitor.delayTime = (System.currentTimeMillis() - lastEntry.getHeader().getExecuteTime());
             }
             if(persisteKeyMsg(messageList) == -1) {
-                logger.info("persistence the data failed !!! reloading ......");
+                logger.info("persistence the data and retry, reconn failed !!! reloading ......");
                 globalFetchThread = 1;
                 return;
             }
-            confirmHBasePos(lastEntry);
+            if(messageList.size() > 0) {
+                confirm2CpStr(lastEntry);
+                continuousZero = 0;//reset
+            } else {
+                continuousZero++;
+                if(continuousZero >= TrackerConf.CONTINUOUS_ZERO_NUM) {
+                    logger.info("=======================> continuous running 0 batch :");
+                    logger.info("-------> 0 batch count = " + continuousZero);
+                    logger.info("-------> sleeping " + TrackerConf.SLEEPING_RUNNING + " ms");
+                    Thread.sleep(TrackerConf.SLEEPING_RUNNING);
+                    continuousZero = 0;//reset
+                }
+            }
             //per minute record
             if(lastEntry != null) {
                 binlog = lastEntry.getHeader().getLogfileName();
@@ -933,9 +889,9 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
             logger.info("---> parser delay time:" + monitor.delayTime + " ms");
             logger.info("---> the number of entry list: " + monitor.persisNum  + " entries");
             logger.info("---> entry list to bytes sum size is " + monitor.batchSize / config.mbUnit + " MB");
-            logger.info("---> position info:" + " binlog file is " + globalBinlogName +
-                    ",position is :" + (lastEntry.getHeader().getLogfileOffset() + lastEntry.getHeader().getEventLength()) + "; batch id is :" + globalXidBatchId +
-                    ",in batch id is :" + globalXidInBatchId);
+            logger.info("---> confirm position info:" + " binlog file is " + globalBinlogName +
+                    ",position is :" + (lastEntry.getHeader().getLogfileOffset() + lastEntry.getHeader().getEventLength()) + "; batch id is :" + batchId +
+                    ",in batch id is :" + inBatchId);
             //send phoenix monitor
             final TrackerMonitor phMonitor = monitor.cloneDeep();
             Thread sendMonitor = new Thread(new Runnable() {
@@ -1064,6 +1020,19 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         }
     }
 
+    /**
+     * confirm to a variable temporarily
+     * @param entry, transaction end entry
+     * @throws Exception
+     */
+    private void confirm2CpStr(CanalEntry.Entry entry) throws Exception {
+        if(entry != null) {
+            String bin = entry.getHeader().getLogfileName();
+            String pos = bin + ":" + (entry.getHeader().getLogfileOffset() + entry.getHeader().getEventLength()) + ":" + batchId + ":" + inBatchId;
+            ConCP = pos;
+        }
+    }
+
     private void confirmPos(CanalEntry.Entry entry) throws Exception {
         if(entry != null) {
             String bin = entry.getHeader().getLogfileName();
@@ -1167,6 +1136,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         }
     }
 
+    @Deprecated
     private boolean isEndEvent(LogEvent event){
         if((event.getHeader().getType()==LogEvent.XID_EVENT)
                 ||(event.getHeader().getType()==LogEvent.QUERY_EVENT
@@ -1177,6 +1147,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
     }
 
     //maybe bug because of getisddl() best is !(BEGIN || COMMIT)
+    @Deprecated
     private boolean isEndEntry(CanalEntry.Entry entry) {
         try {
             if (entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONEND) return true;
@@ -1186,6 +1157,13 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
             e.printStackTrace();
         }
         return false;
+    }
+
+    private boolean isEndCommitEntry(CanalEntry.Entry entry) {
+        if (entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONEND)
+            return true;
+        else
+            return false;
     }
 
     public void pause(String id) throws Exception {
@@ -1201,9 +1179,8 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         logger.info("closing the job......");
         fetcher.iskilled = true;//stop the fetcher thread
         fetcher.shutdown();//stop the fetcher's timer task
-        minter.cancel();//stop the per minute record
         heartBeat.cancel();//stop the heart beat thread
-        timer.cancel();
+        cptimer.cancel();
         htimer.cancel();
         logConnector.disconnect();
         realConnector.disconnect();
@@ -1211,7 +1188,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         msgSender.close();
         zkExecutor.close();
         config.clear();
-        throw new Exception("switch the new node to start the job ......");
+        throw new Exception("switch the new node to starting the job ......");
     }
 
     class RetryTimesOutException extends Exception {

@@ -36,11 +36,16 @@ public class TrackerConf {
     public static String serializer = "kafka.serializer.DefaultEncoder";//default is byte[]
     public static String keySerializer = "kafka.serializer.StringEncoder";
     public static String partitioner = "kafka.producer.DefaultPartitioner";
+    public static String kafkaCompression = "snappy";
     public static String acks = "-1";
     public static String topic = "test";//queue topic
     public static int partition = 0;
     public static String strSeeds = "127.0.0.1";//"172.17.36.53,172.17.36.54,172.17.36.55";
     public static List<String> brokerSeeds = new ArrayList<String>();//"12,13,14"
+    public static final int KAFKA_SEND_RETRY = 3;
+    public static final int KAFKA_CONN_RETRY = 1;
+    public static final long KAFKA_RETRY_INTERNAL = 3000;
+    public static final long KAFKA_SEND_BATCH_SIZE_BYTES = 1000 * 1024;//unit is Bytes, 1024 * 1024 is 1MB
     //zk conf
     public String zkServers = "127.0.0.1:2181";//"48:2181,19:2181,50:2181"
     public int timeout = 100000;
@@ -57,10 +62,18 @@ public class TrackerConf {
     public int minsec = 60;
     public int heartsec = 1 * 60;//10
     public int retrys = 10;//if we retry 100 connect or send failed too, we will reload the job //interval time
-    public double mbUnit = 1024.0 * 1024.0;
+    public double mbUnit = 1024.0 * 1024.0;//unit for 1MB, do not edit it
     public String jobId = "mysql-tracker";
-    public int spacesize = 8;//8 MB
+    public int spacesize = 8;//8 MB, send batch size
     public int monitorsec = 60;//1 minute
+    public static int FILTER_NUM_LOGGER = 500;
+    public static int CONTINUOUS_ZERO_NUM = 20;
+    public static long SLEEPING_RUNNING = 3000;
+    public static int CP_RETRY_COUNT = 3;
+    public static long TIMER_TASK_DELAY = 10 * 1000;
+    public static long CONFIRM_INTERVAL = 60 * 1000;//60 seconds
+    public static long HEARTBEAT_INTERVAL = 60 * 1000;//60 seconds
+    public static long SEND_BATCH_SIZE = 1000 * 1024;//kafka send batch size, default is less than 1MB
     //phenix monitor
     public String phKaBrokerList = "localhost:9092";
     public int phKaPort = 9092;
@@ -81,10 +94,32 @@ public class TrackerConf {
     public long batchId = 0;
     public long inId = 0;
     public String CLASS_PREFIX = "classpath:";
-
-
     //constants
     private static String confPath = "tracker.properties";
+
+    public String toString() {
+        StringBuilder cons = new StringBuilder();
+        cons.append("================================> load conf = \n{\n");
+        cons.append("jobId = " + jobId).append("\n");
+        cons.append("mysql username = " + username).append("\n");
+        cons.append("mysql password = " + password).append("\n");
+        cons.append("mysql address = " + address).append("\n");
+        cons.append("mysql port = " + myPort).append("\n");
+        cons.append("mysql slave id = " + slaveId).append("\n");
+        cons.append("mysql charset = " + charset);
+        cons.append("kafka zk = " + zkKafka).append("\n");
+        cons.append("kafka broker list = " + brokerList).append("\n");
+        cons.append("kafka port = " + kafkaPort).append("\n");
+        cons.append("kafka ack = " + acks).append("\n");
+        cons.append("kafka topic = " + topic).append("\n");
+        cons.append("offset zk = " + zkServers).append("\n");
+        cons.append("monitor kafka zk = " + phKaZk).append("\n");
+        cons.append("monitor kafka broker list = " + phKaBrokerList).append("\n");
+        cons.append("monitor kafka topic = " + phKaTopic).append("\n");
+        cons.append("filter db tb map = " + filterMap).append("\n");
+        cons.append("}");
+        return cons.toString();
+    }
 
 
     public void initConfLocal() {
@@ -178,6 +213,7 @@ public class TrackerConf {
             charset = Charset.forName(data.getString("source_charset"));
             //get kafka parameter from zk
             String dataKafkaZk = data.getString("kafka_zkserver") + data.getString("kafka_zkroot");
+            zkKafka = dataKafkaZk;
             KafkaConf dataCnf = new KafkaConf();
             dataCnf.loadZk(dataKafkaZk);
             brokerList = dataCnf.brokerList;
@@ -188,6 +224,7 @@ public class TrackerConf {
             zkServers = data.getString("offset_zkserver");
             //get kafka monitor parameter from zk
             String monitorKafkaZk = data.getString("monitor_server") + data.getString("monitor_zkroot");
+            phKaZk = monitorKafkaZk;
             KafkaConf monitorCnf = new KafkaConf();
             monitorCnf.loadZk(monitorKafkaZk);
             phKaBrokerList = monitorCnf.brokerList;

@@ -25,8 +25,9 @@ public class KafkaSender {
 
     private KafkaConf conf;
     private Producer<String, byte[]> producer;
-    private int retrys = 10;
-    private int reconns = 5;
+    private int retrys = TrackerConf.KAFKA_SEND_RETRY;
+    private int reconns = TrackerConf.KAFKA_CONN_RETRY;
+    private long internal = TrackerConf.KAFKA_RETRY_INTERNAL;
 
     public KafkaSender(KafkaConf cf) {
         conf = cf;
@@ -39,6 +40,7 @@ public class KafkaSender {
         prop.put("key.serializer.class", conf.keySerializer);
         prop.put("partitioner.class", conf.partitioner);
         prop.put("request.required.acks", conf.acks);
+        prop.put("compression.codec", conf.compression);
         ProducerConfig pConfig = new ProducerConfig(prop);
         producer = new Producer<String, byte[]>(pConfig);
     }
@@ -107,7 +109,7 @@ public class KafkaSender {
                 isAck = true;
             } catch (Exception e) {
                 logger.warn("retrying sending... Exception:" + e.getMessage());
-                delay(3);
+                delayMs(internal);
             }
         }
         return 0;
@@ -144,7 +146,7 @@ public class KafkaSender {
                     e1.printStackTrace();
                 }
                 logger.warn("retrying sending... Exception:" + e.getMessage());
-                delay(3);
+                delayMs(internal);
             }
         }
         return 0;
@@ -170,7 +172,7 @@ public class KafkaSender {
                 isAck = true;
             } catch (Exception e) {
                 logger.warn("retrying sending... Exception:" + e.getMessage());
-                delay(3);
+                delayMs(internal);
             }
         }
         return 0;
@@ -207,7 +209,7 @@ public class KafkaSender {
                     e1.printStackTrace();
                 }
                 logger.warn("retrying sending... Exception:" + e.getMessage());
-                delay(3);
+                delayMs(internal);
             }
         }
         return 0;
@@ -218,6 +220,14 @@ public class KafkaSender {
             Thread.sleep(sec * 1000);
         } catch (InterruptedException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void delayMs(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (Throwable e) {
+            logger.info(e.getMessage(), e);
         }
     }
 
