@@ -53,6 +53,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
     //logger
     private Logger logger = LoggerFactory.getLogger(HandlerMagpieKafkaCheckpointHBase.class);
+    //constants
+    public static final String LOG_HEAD_LINE = "===================================================> ";
     //global config
     private TrackerConf config = new TrackerConf();
     //mysql interface
@@ -464,6 +466,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         public FetchMonitorMin timerMonitor = new FetchMonitorMin();
         public Timer timer = new Timer();
         public CanalEntry.Entry fetchLast;
+        public LogEvent fetchLastEvent;
 
         public boolean iskilled = false;
 
@@ -506,14 +509,14 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
 
             public void run() {
                 try {
-                    logger.info("==============> per minute fetch monitor:");
+                    logger.info(LOG_HEAD_LINE + "per minute fetch monitor:");
                     logger.info("---> fetch number of entry:" + minuteMonitor.fetchNum + " entries");
                     logger.info("---> fetch sum size :" + minuteMonitor.batchSize / config.mbUnit + " MB");
                     //set delay num monitor
                     EntryPosition pos = findPosFromMysqlNow(realQuery);
                     minuteMonitor.delayNum = 0;
                     if(fetchLast != null && pos != null) {
-                        minuteMonitor.delayNum = getDelayNum(pos.getJournalName(), pos.getPosition(), fetchLast.getHeader().getLogfileName(), fetchLast.getHeader().getLogfileOffset());
+                        minuteMonitor.delayNum = getDelayNum(pos.getJournalName(), pos.getPosition(), eventConvert.getBinlogFileName(), fetchLastEvent.getLogPos());
                     } else {
                         minuteMonitor.delayNum = 0;
                     }
@@ -549,6 +552,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                         logger.warn("fetched event is null...");
                         continue;
                     }
+                    fetchLastEvent = event;
                     //entry to event
                     CanalEntry.Entry entry = eventConvert.parse(event);
                     if(entry == null) continue;
@@ -561,7 +565,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                     minuteMonitor.batchSize += event.getEventLen();
                     if(counter >= config.batchsize) {//number / size | per minute
                         monitor.fetchEnd = System.currentTimeMillis();
-                        logger.info("===================================> fetch thread : ");
+                        logger.info(LOG_HEAD_LINE + "fetch thread : ");
                         logger.info("---> fetch during time : " + (monitor.fetchEnd - monitor.fetchStart) + " ms");
                         logger.info("---> fetch number : " + counter + " events");
                         logger.info("---> fetch sum size : " + monitor.batchSize / config.mbUnit + " MB");
@@ -628,7 +632,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
             position = new EntryPosition(vs[0], Long.valueOf(vs[1]));
             batchId = Long.valueOf(vs[2]);
             inBatchId = Long.valueOf(vs[3]);
-            logger.info("=========================> checkpoint load :");
+            logger.info(LOG_HEAD_LINE + "checkpoint load :");
             logger.info("---------------> start position :" + position.getBinlogPosFileName() + ":" + position.getPosition() +
                     ":" + batchId +
                     ":" + inBatchId);
@@ -678,7 +682,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
 
             try {
 
-                logger.info("=================================> check assembly heartbeats......");
+                logger.info(LOG_HEAD_LINE + "check assembly heartbeats......");
 
                 //run function heartbeat
                 logger.info("-------> globalFetchThread :" + globalFetchThread);
@@ -740,12 +744,17 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
          */
         @Override
         public void run() {
+            /*logger*/
+            logger.info(LOG_HEAD_LINE + "confirm checkpoint every minute:");
             /*confirm the checkpoint*/
             int count = 0;
             while (count < TrackerConf.CP_RETRY_COUNT) {
                 try {
                     if (!StringUtils.isBlank(ConCP)) {
                         cpUtil.writeCp(jobId, ConCP);
+                        logger.info("----------> confirm checkpoint = " + ConCP);
+                    } else {
+                        logger.info("----------> nothing to confirm checkpoint, checkpoint is null");
                     }
                     break;//if send success
                 } catch (Throwable e) {
@@ -824,7 +833,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
             } else {
                 continuousFiltered++;
                 if(continuousFiltered >= TrackerConf.FILTER_NUM_LOGGER) {
-                    logger.info("=================================> filtered entries:");
+                    logger.info(LOG_HEAD_LINE + "filtered entries:");
                     logger.info("----> filtered num = " + continuousFiltered);
                     logger.info("----> last filtered entry dbname.tbname = " + dbtb);
                     continuousFiltered = 0;//reset
@@ -863,7 +872,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
             } else {
                 continuousZero++;
                 if(continuousZero >= TrackerConf.CONTINUOUS_ZERO_NUM) {
-                    logger.info("=======================> continuous running 0 batch :");
+                    logger.info(LOG_HEAD_LINE + "continuous running 0 batch :");
                     logger.info("-------> 0 batch count = " + continuousZero);
                     logger.info("-------> sleeping " + TrackerConf.SLEEPING_RUNNING + " ms");
                     Thread.sleep(TrackerConf.SLEEPING_RUNNING);
@@ -883,13 +892,13 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         if(monitor.persisNum > 0) {
             monitor.persistenceStart = startTime;
             monitor.persistenceEnd = System.currentTimeMillis();
-            logger.info("===================================> persistence thread / monitor:");
+            logger.info(LOG_HEAD_LINE + "persistence thread / monitor:");
             logger.info("---> persistence deal during time:" + (monitor.persistenceEnd - monitor.persistenceStart) + " ms");
             logger.info("---> send time :" + (monitor.sendEnd - monitor.sendStart) + " ms");
             logger.info("---> parser delay time:" + monitor.delayTime + " ms");
             logger.info("---> the number of entry list: " + monitor.persisNum  + " entries");
             logger.info("---> entry list to bytes sum size is " + monitor.batchSize / config.mbUnit + " MB");
-            logger.info("---> confirm position info:" + " binlog file is " + globalBinlogName +
+            logger.info("---> commit position info (not confirmed):" + " binlog file is " + globalBinlogName +
                     ",position is :" + (lastEntry.getHeader().getLogfileOffset() + lastEntry.getHeader().getEventLength()) + "; batch id is :" + batchId +
                     ",in batch id is :" + inBatchId);
             //send phoenix monitor

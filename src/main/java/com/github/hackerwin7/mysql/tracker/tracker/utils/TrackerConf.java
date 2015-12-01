@@ -61,7 +61,7 @@ public class TrackerConf {
     public String filterRegex = ".*\\..*";
     public int minsec = 60;
     public int heartsec = 1 * 60;//10
-    public int retrys = 10;//if we retry 100 connect or send failed too, we will reload the job //interval time
+    public int retrys = 3;//if we retry 100 connect or send failed too, we will reload the job //interval time
     public double mbUnit = 1024.0 * 1024.0;//unit for 1MB, do not edit it
     public String jobId = "mysql-tracker";
     public int spacesize = 8;//8 MB, send batch size
