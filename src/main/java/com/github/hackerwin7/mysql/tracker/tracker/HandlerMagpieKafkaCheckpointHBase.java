@@ -696,24 +696,6 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                     globalFetchThread = 1;
                     return;
                 }
-                //check kafka sender
-                if(!msgSender.isConnected()) {
-                    logger.error("kafka producer connection loss, reload the job ......");
-                    globalFetchThread = 1;
-                    return;
-                }
-                //check phoenix kafka sender
-                if(!phMonitorSender.isConnected()) {
-                    logger.error("phoenix kafka producer connection loss, reload the job ......");
-                    globalFetchThread = 1;
-                    return;
-                }
-                //check zk connection
-                if(!zkExecutor.isConnected()) {
-                    logger.error("zookeeper connection loss, reload the job ......");
-                    globalFetchThread = 1;
-                    return;
-                }
                 //check fetch survival
                 if(!fetchSurvival) {
                     logger.error("fetch thread had been dead, reload the job ......");
@@ -839,7 +821,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                     continuousFiltered = 0;//reset
                 }
             }
-            if(messageList.size() >= config.batchsize || monitor.batchSize >= config.spacesize ) break;
+            if(monitor.batchSize >= config. || messageList.size() >= config.batchsize) break;//check per batch size
         }
         //per minute record
 //        if(lastEntry != null) {
@@ -855,7 +837,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         //     so the mysqlbinlog:pos <--> batchId:inBatchId Not must be same event to same event
         // mysqlbinlog:pos <- no filter list's xid  batchid:inBatchId <- filter list's last event
         //entryList data to kafka , per time must confirm the position
-        if((messageList.size() >= config.batchsize || monitor.batchSize >= config.spacesize ) || (System.currentTimeMillis() - startTime) > config.timeInterval * 1000 ) {
+        if((monitor.batchSize >= config.spacesize || messageList.size() >= config.batchsize) || (System.currentTimeMillis() - startTime) > config.timeInterval * 1000 ) {
             //if(lastEntry == null) return; // not messageList but entryList or lastEntry , when we fetched not filtered data , we also confirm the position for it
             if(messageList.size() > 0) {
                 monitor.persisNum = messageList.size();

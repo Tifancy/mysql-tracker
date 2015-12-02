@@ -45,7 +45,9 @@ public class TrackerConf {
     public static final int KAFKA_SEND_RETRY = 3;
     public static final int KAFKA_CONN_RETRY = 1;
     public static final long KAFKA_RETRY_INTERNAL = 3000;
-    public static final long KAFKA_SEND_BATCH_SIZE_BYTES = 1000 * 1024;//unit is Bytes, 1024 * 1024 is 1MB
+    public static final long KAFKA_SEND_COMPRESS_BATCH_BYTES = 1000 * 1024;//compressed batch size must < 1MB
+    public static final long KAFKA_SEND_DEFAULT_BATCH_BYTES = 1024 * 1024;
+    public long KAFKA_SEND_BATCH_BYTES = KAFKA_SEND_DEFAULT_BATCH_BYTES;//unit is Bytes, 1024 * 1024 is 1MB
     //zk conf
     public String zkServers = "127.0.0.1:2181";//"48:2181,19:2181,50:2181"
     public int timeout = 100000;
@@ -73,7 +75,6 @@ public class TrackerConf {
     public static long TIMER_TASK_DELAY = 10 * 1000;
     public static long CONFIRM_INTERVAL = 60 * 1000;//60 seconds
     public static long HEARTBEAT_INTERVAL = 60 * 1000;//60 seconds
-    public static long SEND_BATCH_SIZE = 1000 * 1024;//kafka send batch size, default is less than 1MB
     //phenix monitor
     public String phKaBrokerList = "localhost:9092";
     public int phKaPort = 9092;
@@ -257,6 +258,11 @@ public class TrackerConf {
             if(data.containsKey("position-iid")) {
                 inId = Long.valueOf(data.getString("position-iid"));
             }
+        }
+
+        //related check
+        if(!StringUtils.isBlank(kafkaCompression)) {
+            KAFKA_SEND_BATCH_BYTES = KAFKA_SEND_COMPRESS_BATCH_BYTES;
         }
     }
 
