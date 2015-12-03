@@ -821,7 +821,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
                     continuousFiltered = 0;//reset
                 }
             }
-            if(monitor.batchSize >= config. || messageList.size() >= config.batchsize) break;//check per batch size
+            if(monitor.batchSize >= config.sendBytes || messageList.size() >= config.batchsize) break;//check per batch size
         }
         //per minute record
 //        if(lastEntry != null) {
@@ -837,7 +837,7 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
         //     so the mysqlbinlog:pos <--> batchId:inBatchId Not must be same event to same event
         // mysqlbinlog:pos <- no filter list's xid  batchid:inBatchId <- filter list's last event
         //entryList data to kafka , per time must confirm the position
-        if((monitor.batchSize >= config.spacesize || messageList.size() >= config.batchsize) || (System.currentTimeMillis() - startTime) > config.timeInterval * 1000 ) {
+        if((monitor.batchSize >= config.sendBytes || messageList.size() >= config.batchsize) || (System.currentTimeMillis() - startTime) > config.sendTimeInterval ) {
             //if(lastEntry == null) return; // not messageList but entryList or lastEntry , when we fetched not filtered data , we also confirm the position for it
             if(messageList.size() > 0) {
                 monitor.persisNum = messageList.size();
@@ -1168,18 +1168,30 @@ public class HandlerMagpieKafkaCheckpointHBase implements MagpieExecutor {
 
     public void close(String id) throws Exception {
         logger.info("closing the job......");
-        fetcher.iskilled = true;//stop the fetcher thread
-        fetcher.shutdown();//stop the fetcher's timer task
-        heartBeat.cancel();//stop the heart beat thread
-        cptimer.cancel();
-        htimer.cancel();
-        logConnector.disconnect();
-        realConnector.disconnect();
-        tableConnector.disconnect();
-        msgSender.close();
-        zkExecutor.close();
-        config.clear();
-        throw new Exception("switch the new node to starting the job ......");
+        if(fetcher != null) {
+            fetcher.iskilled = true;//stop the fetcher thread
+            fetcher.shutdown();//stop the fetcher's timer task
+        }
+        if(heartBeat != null)
+            heartBeat.cancel();//stop the heart beat thread
+        if(cptimer != null)
+            cptimer.cancel();
+        if(htimer != null)
+            htimer.cancel();
+        if(logConnector != null)
+            logConnector.disconnect();
+        if(realConnector != null)
+            realConnector.disconnect();
+        if(tableConnector != null)
+            tableConnector.disconnect();
+        if(msgSender != null)
+            msgSender.close();
+        if(zkExecutor != null)
+            zkExecutor.close();
+        if(config != null)
+            config.clear();
+        logger.info("system exiting......");
+        System.exit(0);
     }
 
     class RetryTimesOutException extends Exception {

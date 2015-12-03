@@ -108,7 +108,7 @@ public class KafkaSender {
                 producer.send(keyMsgs);
                 isAck = true;
             } catch (Exception e) {
-                logger.warn("retrying sending... Exception:" + e.getMessage());
+                logger.warn("retrying sending... Exception:" + e.getMessage(), e);
                 delayMs(internal);
             }
         }
@@ -126,7 +126,7 @@ public class KafkaSender {
                 if(reconnKafka > reconns) {
                     return -1;
                 }
-                logger.warn("retry times out, reconnect the kafka server......");
+                logger.error("retry times out, reconnect the kafka server......");
                 retryKafka = 0;
             }
             retryKafka++;
@@ -145,7 +145,7 @@ public class KafkaSender {
                 } catch (Exception e1) {
                     e1.printStackTrace();
                 }
-                logger.warn("retrying sending... Exception:" + e.getMessage());
+                logger.error("retrying sending... Exception:" + e.getMessage(), e);
                 delayMs(internal);
             }
         }
@@ -171,7 +171,7 @@ public class KafkaSender {
                 producer.send(keyMsg);
                 isAck = true;
             } catch (Exception e) {
-                logger.warn("retrying sending... Exception:" + e.getMessage());
+                logger.error("retrying sending... Exception:" + e.getMessage());
                 delayMs(internal);
             }
         }
@@ -208,7 +208,7 @@ public class KafkaSender {
                 } catch (Exception e1) {
                     e1.printStackTrace();
                 }
-                logger.warn("retrying sending... Exception:" + e.getMessage());
+                logger.error("retrying sending... Exception:" + e.getMessage(), e);
                 delayMs(internal);
             }
         }

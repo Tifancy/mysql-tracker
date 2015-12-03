@@ -47,7 +47,8 @@ public class TrackerConf {
     public static final long KAFKA_RETRY_INTERNAL = 3000;
     public static final long KAFKA_SEND_COMPRESS_BATCH_BYTES = 1000 * 1024;//compressed batch size must < 1MB
     public static final long KAFKA_SEND_DEFAULT_BATCH_BYTES = 1024 * 1024;
-    public long KAFKA_SEND_BATCH_BYTES = KAFKA_SEND_DEFAULT_BATCH_BYTES;//unit is Bytes, 1024 * 1024 is 1MB
+    public long sendBytes = KAFKA_SEND_DEFAULT_BATCH_BYTES;//unit is Bytes, 1024 * 1024 is 1MB, 1MB must send
+    public long sendTimeInterval = 5000;//5 second must send
     //zk conf
     public String zkServers = "127.0.0.1:2181";//"48:2181,19:2181,50:2181"
     public int timeout = 100000;
@@ -262,7 +263,7 @@ public class TrackerConf {
 
         //related check
         if(!StringUtils.isBlank(kafkaCompression)) {
-            KAFKA_SEND_BATCH_BYTES = KAFKA_SEND_COMPRESS_BATCH_BYTES;
+            sendBytes = KAFKA_SEND_COMPRESS_BATCH_BYTES;
         }
     }
 
