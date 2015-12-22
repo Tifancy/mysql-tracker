@@ -27,7 +27,7 @@
 
     <groupId>com.github.hackerwin7</groupId>
     <artifactId>mysql-tracker</artifactId>
-    <version>1.4.0.3</version>
+    <version>1.4.0.4</version>
 
     <dependencies>
         <dependency>
@@ -265,7 +265,7 @@
                         <exclude>**/tracker.properties</exclude>
                         <exclude>**/simple-tracker.properties</exclude>
                         <exclude>**/log4j.properties</exclude>
-                        <exclude>**/input_config.yaml</exclude>
+                        <!--<exclude>**/input_config.yaml</exclude>-->
                     </excludes>
                 </configuration>
             </plugin>
@@ -333,7 +333,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.5</version>
+                <version>1.6</version>
                 <executions>
                     <execution>
                         <phase>verify</phase>
@@ -342,6 +342,10 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <useAgent>true</useAgent>
+                    <skip>true</skip>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

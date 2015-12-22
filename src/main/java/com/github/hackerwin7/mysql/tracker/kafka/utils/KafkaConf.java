@@ -18,12 +18,12 @@ public class KafkaConf {
     public String serializer = "kafka.serializer.DefaultEncoder";//default is byte[]
     public String keySerializer = "kafka.serializer.StringEncoder";//default is message's byte[]
     public String partitioner = "kafka.producer.DefaultPartitioner";
-    public String compression = "";
+    public String compression = "none";
     public String acks = "1";
     public String sendBufferSize = String.valueOf(1024 * 1024);//1MB
     public String topic;//queue topic
     public int partition = 0;
-    public List<String> topics = new ArrayList<String>();//distribute the multiple topic
+    public List<String> topics = new ArrayList<String>(`);//distribute the multiple topic
     public List<String> brokerSeeds = new ArrayList<String>();//"12,13,14"
     public List<Integer> portList = new ArrayList<Integer>();//9092 9093 9094
     public int readBufferSize = 1 * 1024 * 1024;//1 MB

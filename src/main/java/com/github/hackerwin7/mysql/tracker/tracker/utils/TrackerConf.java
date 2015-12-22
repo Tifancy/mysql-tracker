@@ -196,7 +196,7 @@ public class TrackerConf {
 
     public void initConfOnlineJSON() throws Exception {
         clear();
-        ConfigJson jcnf = new ConfigJson(jobId, "relase.address");
+        ConfigJson jcnf = new ConfigJson(jobId, "release.address");
         JSONObject root = jcnf.getJson();
         //parse the json
         if(root != null) {
