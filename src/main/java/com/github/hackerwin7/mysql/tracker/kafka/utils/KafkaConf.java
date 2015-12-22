@@ -23,7 +23,7 @@ public class KafkaConf {
     public String sendBufferSize = String.valueOf(1024 * 1024);//1MB
     public String topic;//queue topic
     public int partition = 0;
-    public List<String> topics = new ArrayList<String>(`);//distribute the multiple topic
+    public List<String> topics = new ArrayList<String>();//distribute the multiple topic
     public List<String> brokerSeeds = new ArrayList<String>();//"12,13,14"
     public List<Integer> portList = new ArrayList<Integer>();//9092 9093 9094
     public int readBufferSize = 1 * 1024 * 1024;//1 MB
