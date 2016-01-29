@@ -23,9 +23,9 @@
                 <include>/**/*.class</include>
                 <include>*.xml</include>
                 <include>/**/*.xml</include>
+                <include>META-INF/**/*</include>
                 <include>*.properties</include>
                 <include>/**/*.properties</include>
-                <include>META-INF/**/*</include>
             </includes>
         </fileSet>
         <fileSet>

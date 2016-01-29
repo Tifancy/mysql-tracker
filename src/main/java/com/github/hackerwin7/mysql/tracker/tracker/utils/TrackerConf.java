@@ -1,10 +1,12 @@
 package com.github.hackerwin7.mysql.tracker.tracker.utils;
 
+import com.github.hackerwin7.jd.lib.utils.SiteConfService;
 import com.github.hackerwin7.mysql.tracker.kafka.utils.KafkaConf;
 import com.github.hackerwin7.mysql.tracker.protocol.json.ConfigJson;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.commons.lang.StringUtils;
+import org.ho.yaml.Yaml;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,6 +100,8 @@ public class TrackerConf {
     public String CLASS_PREFIX = "classpath:";
     //constants
     private static String confPath = "tracker.properties";
+    //url config file
+    public static final String LOAD_FILE_CONF = "input_config.yaml";
 
     public String toString() {
         StringBuilder cons = new StringBuilder();
@@ -259,6 +263,79 @@ public class TrackerConf {
             if(data.containsKey("position-iid")) {
                 inId = Long.valueOf(data.getString("position-iid"));
             }
+        }
+
+        //related check
+        if(!StringUtils.isBlank(kafkaCompression)) {
+            sendBytes = KAFKA_SEND_COMPRESS_BATCH_BYTES;
+        }
+    }
+
+    /**
+     * read the config from the site config
+     * @throws Exception
+     */
+    public void initConfigFromSiteConfig() throws Exception {
+        clear();
+        SiteConfService scs = new SiteConfService();
+        logger.error("loading config");
+        String val = scs.read(jobId);
+        logger.error("loaded config");
+        //parse the json
+        logger.error("parsing json.......");
+        JSONObject data = JSONObject.fromObject(val);
+        //mysql simple load
+        username = data.getString("source_user");
+        password = data.getString("source_password");
+        address = data.getString("source_host");
+        myPort = Integer.valueOf(data.getString("source_port"));
+        slaveId = Long.valueOf(data.getString("slaveId"));
+        charset = Charset.forName(data.getString("source_charset"));
+        //get kafka parameter from zk
+        String dataKafkaZk = data.getString("kafka_zkserver") + data.getString("kafka_zkroot");
+        zkKafka = dataKafkaZk;
+        KafkaConf dataCnf = new KafkaConf();
+        dataCnf.loadZk(dataKafkaZk);
+        brokerList = dataCnf.brokerList;
+        //kafka simple load json
+        acks = data.getString("kafka_acks");
+        topic = data.getString("tracker_log_topic");
+        //load own zk
+        zkServers = data.getString("offset_zkserver");
+        //get kafka monitor parameter from zk
+        String monitorKafkaZk = data.getString("monitor_server") + data.getString("monitor_zkroot");
+        phKaZk = monitorKafkaZk;
+        KafkaConf monitorCnf = new KafkaConf();
+        monitorCnf.loadZk(monitorKafkaZk);
+        phKaBrokerList = monitorCnf.brokerList;
+        //kafka simple loadjson
+        phKaTopic = data.getString("monitor_topic");
+        //jobId
+        jobId = data.getString("job_id");
+        //filter load
+        if(data.containsKey("db_tab_meta")) {
+            JSONArray jf = data.getJSONArray("db_tab_meta");
+            for (int i = 0; i <= jf.size() - 1; i++) {
+                JSONObject jdata = jf.getJSONObject(i);
+                String dbname = jdata.getString("dbname");
+                String tbname = jdata.getString("tablename");
+                String key = dbname + "." + tbname;
+                String value = tbname;
+                filterMap.put(key, value);
+            }
+        }
+        //load position
+        if(data.containsKey("position-logfile")) {
+            logfile = data.getString("position-logfile");
+        }
+        if(data.containsKey("position-offset")) {
+            offset = Long.valueOf(data.getString("position-offset"));
+        }
+        if(data.containsKey("position-bid")) {
+            batchId = Long.valueOf(data.getString("position-bid"));
+        }
+        if(data.containsKey("position-iid")) {
+            inId = Long.valueOf(data.getString("position-iid"));
         }
 
         //related check
