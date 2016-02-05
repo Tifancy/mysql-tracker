@@ -880,6 +880,7 @@ public class HandlerMagpieKafkaCheckpointHBaseSiteConfig implements MagpieExecut
             logger.info("---> parser delay time:" + monitor.delayTime + " ms");
             logger.info("---> the number of entry list: " + monitor.persisNum  + " entries");
             logger.info("---> entry list to bytes sum size is " + monitor.batchSize / config.mbUnit + " MB");
+            logger.info("---> memory queue size :" + entryQueue.size());
             logger.info("---> commit position info (not confirmed):" + " binlog file is " + globalBinlogName +
                     ",position is :" + (lastEntry.getHeader().getLogfileOffset() + lastEntry.getHeader().getEventLength()) + "; batch id is :" + batchId +
                     ",in batch id is :" + inBatchId);

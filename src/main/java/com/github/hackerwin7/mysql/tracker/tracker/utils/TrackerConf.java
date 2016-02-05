@@ -59,8 +59,8 @@ public class TrackerConf {
     public String persisPath = rootPath + "/persistence";
     public String minutePath = rootPath + "/minutes";
     //tracker conf
-    public int batchsize = 10000;
-    public int queuesize = 50000;
+    public int batchsize = 50000;// default is 10000
+    public int queuesize = 80000;//default is 50000
     public int sumBatch = 5 * batchsize;
     public int timeInterval = 1;
     public int reInterval = 3;
