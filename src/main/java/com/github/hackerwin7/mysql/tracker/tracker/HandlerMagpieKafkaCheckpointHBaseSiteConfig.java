@@ -422,7 +422,7 @@ public class HandlerMagpieKafkaCheckpointHBaseSiteConfig implements MagpieExecut
         try {
             init();
         } catch (RetryTimesOutException e) {//reload the job by run()
-            logger.error(e.getMessage());
+            logger.error(e.getMessage(), e);
             return;
         }
         //start thread

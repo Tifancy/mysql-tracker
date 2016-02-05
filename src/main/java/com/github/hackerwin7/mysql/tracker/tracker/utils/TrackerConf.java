@@ -5,7 +5,7 @@ import com.github.hackerwin7.mysql.tracker.kafka.utils.KafkaConf;
 import com.github.hackerwin7.mysql.tracker.protocol.json.ConfigJson;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.ho.yaml.Yaml;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +49,7 @@ public class TrackerConf {
     public static final long KAFKA_RETRY_INTERNAL = 3000;
     public static final long KAFKA_SEND_COMPRESS_BATCH_BYTES = 1000 * 1024;//compressed batch size must < 1MB
     public static final long KAFKA_SEND_DEFAULT_BATCH_BYTES = 1024 * 1024;
+    public static final long KAFKA_SEND_UNCOMPRESS_BATCH_BYTES = 10 * 1024 * 1024;//10 MB
     public long sendBytes = KAFKA_SEND_DEFAULT_BATCH_BYTES;//unit is Bytes, 1024 * 1024 is 1MB, 1MB must send
     public long sendTimeInterval = 5000;//5 second must send
     //zk conf
@@ -203,9 +204,9 @@ public class TrackerConf {
         ConfigJson jcnf = new ConfigJson(jobId, "release.address");
         JSONObject root = jcnf.getJson();
         //parse the json
-        if(root != null) {
+        if (root != null) {
             int _code = root.getInt("_code");
-            if(_code != 0) {
+            if (_code != 0) {
                 String errMsg = root.getString("errorMessage");
                 throw new Exception(errMsg);
             }
@@ -239,7 +240,7 @@ public class TrackerConf {
             //jobId
             jobId = data.getString("job_id");
             //filter load
-            if(data.containsKey("db_tab_meta")) {
+            if (data.containsKey("db_tab_meta")) {
                 JSONArray jf = data.getJSONArray("db_tab_meta");
                 for (int i = 0; i <= jf.size() - 1; i++) {
                     JSONObject jdata = jf.getJSONObject(i);
@@ -251,24 +252,25 @@ public class TrackerConf {
                 }
             }
             //load position
-            if(data.containsKey("position-logfile")) {
+            if (data.containsKey("position-logfile")) {
                 logfile = data.getString("position-logfile");
             }
-            if(data.containsKey("position-offset")) {
+            if (data.containsKey("position-offset")) {
                 offset = Long.valueOf(data.getString("position-offset"));
             }
-            if(data.containsKey("position-bid")) {
+            if (data.containsKey("position-bid")) {
                 batchId = Long.valueOf(data.getString("position-bid"));
             }
-            if(data.containsKey("position-iid")) {
+            if (data.containsKey("position-iid")) {
                 inId = Long.valueOf(data.getString("position-iid"));
             }
         }
 
         //related check
-        if(!StringUtils.isBlank(kafkaCompression)) {
+        if (!StringUtils.equalsIgnoreCase(kafkaCompression, "none"))
             sendBytes = KAFKA_SEND_COMPRESS_BATCH_BYTES;
-        }
+        else
+            sendBytes = KAFKA_SEND_UNCOMPRESS_BATCH_BYTES;
     }
 
     /**
@@ -338,10 +340,13 @@ public class TrackerConf {
             inId = Long.valueOf(data.getString("position-iid"));
         }
 
+        kafkaCompression = "none";
+
         //related check
-        if(!StringUtils.isBlank(kafkaCompression)) {
+        if (!StringUtils.equalsIgnoreCase(kafkaCompression, "none"))
             sendBytes = KAFKA_SEND_COMPRESS_BATCH_BYTES;
-        }
+        else
+            sendBytes = KAFKA_SEND_UNCOMPRESS_BATCH_BYTES;
     }
 
     //clear the conf info
