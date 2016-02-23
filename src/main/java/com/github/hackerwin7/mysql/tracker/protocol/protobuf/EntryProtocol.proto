@@ -1,6 +1,6 @@
-package protocol.protobuf;
+package com.github.hackerwin7.mysql.tracker.protocol.protobuf;
 
-option java_package = "protocol.protobuf";
+option java_package = "com.github.hackerwin7.mysql.tracker.protocol.protobuf";
 option java_outer_classname = "CanalEntry";
 option optimize_for = SPEED;
 

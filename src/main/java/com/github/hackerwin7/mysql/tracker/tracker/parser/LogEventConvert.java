@@ -49,11 +49,11 @@ public class LogEventConvert {
     public static final int             SMALLINT_MAX_VALUE  = 65536;
     public static final int             MEDIUMINT_MAX_VALUE = 16777216;
     public static final long            INTEGER_MAX_VALUE   = 4294967296L;
-    public static final BigInteger BIGINT_MAX_VALUE    = new BigInteger("18446744073709551616");
+    public static final BigInteger      BIGINT_MAX_VALUE    = new BigInteger("18446744073709551616");
     public static final int             version             = 1;
     public static final String          BEGIN               = "BEGIN";
     public static final String          COMMIT              = "COMMIT";
-    public static final Logger logger              = LoggerFactory.getLogger(LogEventConvert.class);
+    public static final Logger          logger              = LoggerFactory.getLogger(LogEventConvert.class);
 
     private volatile AviaterRegexFilter nameFilter;                                                          // 运行时引用可能会有变化，比如规则发生变化时
     private TableMetaCache tableMetaCache;
@@ -63,7 +63,7 @@ public class LogEventConvert {
     }
 
     private String                      binlogFileName      = "mysql-bin.000001";
-    private Charset charset             = Charset.defaultCharset();
+    private Charset                     charset             = Charset.defaultCharset();
     private boolean                     filterQueryDcl      = false;
     private boolean                     filterQueryDml      = false;
     private boolean                     filterQueryDdl      = false;
