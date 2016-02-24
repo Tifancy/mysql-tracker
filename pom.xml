@@ -27,7 +27,7 @@
 
     <groupId>com.github.hackerwin7</groupId>
     <artifactId>mysql-tracker</artifactId>
-    <version>1.4.1.10</version>
+    <version>1.4.2.1</version>
 
     <dependencies>
         <dependency>
