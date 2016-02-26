@@ -73,7 +73,9 @@ public class SimpleLogEventConvert {
                 break;
             case LogEvent.QUERY_EVENT:
                 logger.info("EVENT : query");
-                return parseQueryEvent((QueryLogEvent) logEvent);
+                //do not transfer query event
+                //return parseQueryEvent((QueryLogEvent) logEvent);
+                break;
             case LogEvent.XID_EVENT:
                 logger.info("EVENT : xid");
                 return parseXidEvent((XidLogEvent) logEvent);
