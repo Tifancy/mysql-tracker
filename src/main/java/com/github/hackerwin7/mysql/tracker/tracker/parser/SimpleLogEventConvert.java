@@ -372,9 +372,9 @@ public class SimpleLogEventConvert {
         headerBuilder.setEventLen(logHeader.getEventLen());
         if(eventType != null)
             headerBuilder.setEventType(eventType);
-        if(StringUtils.isBlank(dbName))
+        if(!StringUtils.isBlank(dbName))
             headerBuilder.setDatabaseName(dbName);
-        if(StringUtils.isBlank(tbName))
+        if(!StringUtils.isBlank(tbName))
             headerBuilder.setTableName(tbName);
         return headerBuilder.build();
     }
