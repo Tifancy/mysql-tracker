@@ -364,7 +364,7 @@ public class HandlerMagpieKafkaCheckpointHBaseSiteConfig implements MagpieExecut
                 throw new Exception("show master status failed");
             }
             pos = new EntryPosition(fields.get(0), Long.valueOf(fields.get(1)));
-        } catch (Exception e) {
+        } catch (Exception e) { // throwable
             logger.error("show master status error!!!");
             e.printStackTrace();
         }
